@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Scene</title>
+<!-- <script src="libs/underscore-esm.js"></script> -->
+<script src="/libs/three/three.js"></script>
+<script src="/libs/three/TrackballControls.js"></script>
+<script src="/libs/three/OrbitControls.js"></script>
+<script src="/libs/three/DRACOLoader.js"></script>
+<script src="/libs/three/GLTFLoader.js"></script>
+<script src="/libs/three/FBXLoader.js"></script>
+<script>
+function initRenderer(eleID, props = {}) {
+    let renderer = new THREE.WebGLRenderer(props)
+    renderer.shadowMap.enabled = true
+    renderer.shadowMapSoft = true
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+
+    renderer.setClearColor(new THREE.Color(0x000000))
+    renderer.setSize(window.innerWidth, window.innerHeight)
+    renderer.shadowMap.enabled = true
+    document.getElementById(eleID).appendChild(renderer.domElement)
+
+    return renderer
+}
+
+function initCamera(position = new THREE.Vector3(-100, 60, 100)) {
+    let camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000)
+    camera.position.copy(position)
+    camera.lookAt(new THREE.Vector3(0, 0, 0))
+
+    return camera
+}
+
+function initDefaultDirectionalLighting(scene, position = new THREE.Vector3(100, 200, 200)) {
+    let dirLight = new THREE.DirectionalLight(0xffffff)
+    dirLight.position.copy(position)
+    dirLight.shadow.mapSize.width = 2048
+    dirLight.shadow.mapSize.height = 2048
+    dirLight.castShadow = true
+
+    dirLight.shadow.camera.left = -200
+    dirLight.shadow.camera.right = 200
+    dirLight.shadow.camera.top = 200
+    dirLight.shadow.camera.bottom = -200
+
+    scene.add(dirLight)
+
+    let ambientLight = new THREE.AmbientLight(0xdddddd)
+    ambientLight.name = "ambientLight"
+    scene.add(ambientLight)
+}
+
+function initTrackballControls(camera, renderer) {
+    let trackballControls = new THREE.TrackballControls(camera, renderer.domElement)
+    trackballControls.rotateSpeed = 1.0
+    trackballControls.zoomSpeed = 1.2
+    trackballControls.panSpeed = 0.8
+    trackballControls.noZoom = false
+    trackballControls.noPan = false
+    trackballControls.staticMoving = true
+    trackballControls.dynamicDampingFactor = 0.3
+    trackballControls.keys = [65, 83, 68]
+    trackballControls.object.position.set(-140, 30, 140)
+    trackballControls.target = new THREE.Vector3(0, 60, 0)
+
+    return trackballControls
+}
+
+function addLargeGroundPlane(scene) {
+    let planeGeometry = new THREE.PlaneGeometry(10000, 10000)
+    let planeMeterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff
+    })
+    let textureLoader = new THREE.TextureLoader()
+    planeMeterial.map = textureLoader.load('/assets/images/textures/ground.jpg')
+    planeMeterial.map.wrapS = THREE.RepeatWrapping
+    planeMeterial.map.wrapT = THREE.RepeatWrapping
+    planeMeterial.map.repeat.set(80, 80)
+
+    let plane = new THREE.Mesh(planeGeometry, planeMeterial)
+    plane.receiveShadow = true
+
+    plane.rotation.x = -0.5 * Math.PI
+    plane.position.x = 0
+    plane.position.y = 0
+    plane.position.z = -100
+
+    scene.add(plane)
+
+    return plane
+}
+</script>
+</head>
+<body>
+<div id="scene-co"></div>
+<script>
+(function init() {
+    let renderer = initRenderer('scene-co')
+    let camera = initCamera()
+    let trackballControls = initTrackballControls(camera, renderer)
+    let clock = new THREE.Clock()
+
+    let scene = new THREE.Scene()
+    scene.fog = new THREE.Fog(0xffffff, 0.015, 800)
+    initDefaultDirectionalLighting(scene)
+
+    let scUrls = [
+        '/assets/images/v360/px.jpg',
+        '/assets/images/v360/nx.jpg',
+        '/assets/images/v360/py.jpg',
+        '/assets/images/v360/ny.jpg',
+        '/assets/images/v360/pz.jpg',
+        '/assets/images/v360/nz.jpg'
+    ]
+
+    let scCubeLoader = new THREE.CubeTextureLoader()
+    scene.background = scCubeLoader.load(scUrls)
+
+
+    addLargeGroundPlane(scene)
+
+    const dracoLoader = new THREE.DRACOLoader()
+    dracoLoader.setDecoderPath( '/libs/draco/gltf/' )
+
+    let loader = new THREE.GLTFLoader()
+    loader.setDRACOLoader( dracoLoader )
+    loader.load('/assets/models/LittlestTokyo.glb', function(result) {
+        result.scene.translateY(40.2)
+        result.scene.scale.set( 0.2, 0.2, 0.2 )
+        result.scene.traverse((o) => {
+            if (o.isMesh) {
+                o.receiveShadow = true
+                o.castShadow = true
+            }
+        })
+        scene.add(result.scene)
+    })
+
+    /*
+    const loader = new THREE.FBXLoader()
+    loader.load( '/assets/models/outfield2016_2.fbx', function ( object ) {
+
+        object.traverse( function ( child ) {
+
+            if ( child.isMesh ) {
+
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+            }
+
+        } )
+
+        scene.add( object )
+        console.log('yes.')
+    } )
+    */
+
+    function render() {
+        trackballControls.update(clock.getDelta)
+        requestAnimationFrame(render)
+        renderer.render(scene, camera)
+    }
+    render()
+
+})()
+</script>
+</body>
+</html>
